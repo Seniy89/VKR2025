@@ -1,0 +1,1044 @@
+// src/App.js
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { ThemeProvider, CssBaseline } from '@mui/material';
+import { AuthProvider } from './context/AuthContext';
+import { ChatProvider } from './context/ChatContext';
+import { ProfileProvider } from './context/ProfileContext';
+import theme from './theme';
+import Layout from './components/Layout';
+import Home from './pages/Home';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Profile from './pages/Profile';
+import Chat from './pages/Chat';
+import PrivateRoute from './components/PrivateRoute';
+
+function App() {
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <AuthProvider>
+        <ProfileProvider>
+          <ChatProvider>
+            <Router>
+              <Layout>
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                  <Route
+                    path="/profile"
+                    element={
+                      <PrivateRoute>
+                        <Profile />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/chat"
+                    element={
+                      <PrivateRoute>
+                        <Chat />
+                      </PrivateRoute>
+                    }
+                  />
+                </Routes>
+              </Layout>
+            </Router>
+          </ChatProvider>
+        </ProfileProvider>
+      </AuthProvider>
+    </ThemeProvider>
+  );
+}
+
+export default App;
+
+// src/context/ProfileContext.js
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
+
+const ProfileContext = createContext();
+
+export const useProfile = () => {
+  const context = useContext(ProfileContext);
+  if (!context) {
+    throw new Error('useProfile must be used within a ProfileProvider');
+  }
+  return context;
+};
+
+export const ProfileProvider = ({ children }) => {
+  const { user } = useAuth();
+  const [profileData, setProfileData] = useState({
+    name: '',
+    about: '',
+    specializations: [],
+    experience: '',
+    skills: '',
+    education: '',
+    languages: '',
+    location: '',
+    website: '',
+    photoURL: '',
+    rating: 0,
+    completedProjects: 0
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const loadProfileData = async () => {
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        const savedData = localStorage.getItem(`profile_${user.id}`);
+        if (savedData) {
+          setProfileData(JSON.parse(savedData));
+        } else {
+          const initialData = {
+            name: user.displayName || '',
+            about: '',
+            specializations: [],
+            experience: '',
+            skills: '',
+            education: '',
+            languages: '',
+            location: '',
+            website: '',
+            photoURL: user.photoURL || '',
+            rating: 0,
+            completedProjects: 0
+          };
+          setProfileData(initialData);
+          localStorage.setItem(`profile_${user.id}`, JSON.stringify(initialData));
+        }
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadProfileData();
+  }, [user]);
+
+  const updateProfile = async (newData) => {
+    try {
+      setError(null);
+      const updatedData = { ...profileData, ...newData };
+      setProfileData(updatedData);
+      localStorage.setItem(`profile_${user.id}`, JSON.stringify(updatedData));
+      return true;
+    } catch (err) {
+      setError(err.message);
+      return false;
+    }
+  };
+
+  const updateProfilePhoto = async (file) => {
+    try {
+      setError(null);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const photoURL = reader.result;
+        updateProfile({ photoURL });
+      };
+      reader.readAsDataURL(file);
+      return true;
+    } catch (err) {
+      setError(err.message);
+      return false;
+    }
+  };
+
+  const updateSpecializations = async (specializations) => {
+    return updateProfile({ specializations });
+  };
+
+  const updateRating = async (rating) => {
+    return updateProfile({ rating });
+  };
+
+  const updateCompletedProjects = async (completedProjects) => {
+    return updateProfile({ completedProjects });
+  };
+
+  const value = {
+    profileData,
+    isLoading,
+    error,
+    updateProfile,
+    updateProfilePhoto,
+    updateSpecializations,
+    updateRating,
+    updateCompletedProjects
+  };
+
+  return (
+    <ProfileContext.Provider value={value}>
+      {children}
+    </ProfileContext.Provider>
+  );
+};
+
+// src/context/ChatContext.js
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
+
+const ChatContext = createContext();
+
+export const useChat = () => {
+  const context = useContext(ChatContext);
+  if (!context) {
+    throw new Error('useChat must be used within a ChatProvider');
+  }
+  return context;
+};
+
+export const ChatProvider = ({ children }) => {
+  const { user } = useAuth();
+  const [chats, setChats] = useState([]);
+  const [messages, setMessages] = useState({});
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const loadChats = async () => {
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        const savedChats = localStorage.getItem(`chats_${user.id}`);
+        const savedMessages = localStorage.getItem(`messages_${user.id}`);
+
+        if (savedChats) {
+          setChats(JSON.parse(savedChats));
+        }
+        if (savedMessages) {
+          setMessages(JSON.parse(savedMessages));
+        }
+
+        const unread = Object.values(JSON.parse(savedMessages || '{}'))
+          .flat()
+          .filter(msg => !msg.read && msg.senderId !== user.id)
+          .length;
+        setUnreadCount(unread);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadChats();
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem(`chats_${user.id}`, JSON.stringify(chats));
+      localStorage.setItem(`messages_${user.id}`, JSON.stringify(messages));
+    }
+  }, [chats, messages, user]);
+
+  const createChat = async (userId, userData) => {
+    try {
+      setError(null);
+      const newChat = {
+        id: Date.now().toString(),
+        userId,
+        userData,
+        lastMessage: null,
+        createdAt: new Date().toISOString()
+      };
+      setChats(prev => [...prev, newChat]);
+      setMessages(prev => ({ ...prev, [newChat.id]: [] }));
+      return newChat;
+    } catch (err) {
+      setError(err.message);
+      return null;
+    }
+  };
+
+  const sendMessage = async (chatId, text) => {
+    try {
+      setError(null);
+      const newMessage = {
+        id: Date.now().toString(),
+        text,
+        senderId: user.id,
+        timestamp: new Date().toISOString(),
+        read: false
+      };
+
+      setMessages(prev => ({
+        ...prev,
+        [chatId]: [...(prev[chatId] || []), newMessage]
+      }));
+
+      setChats(prev => prev.map(chat => 
+        chat.id === chatId
+          ? { ...chat, lastMessage: newMessage }
+          : chat
+      ));
+
+      return newMessage;
+    } catch (err) {
+      setError(err.message);
+      return null;
+    }
+  };
+
+  const markMessagesAsRead = async (chatId) => {
+    try {
+      setError(null);
+      setMessages(prev => ({
+        ...prev,
+        [chatId]: (prev[chatId] || []).map(msg => 
+          msg.senderId !== user.id ? { ...msg, read: true } : msg
+        )
+      }));
+
+      const unread = Object.values(messages)
+        .flat()
+        .filter(msg => !msg.read && msg.senderId !== user.id)
+        .length;
+      setUnreadCount(unread);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const deleteChat = async (chatId) => {
+    try {
+      setError(null);
+      setChats(prev => prev.filter(chat => chat.id !== chatId));
+      setMessages(prev => {
+        const newMessages = { ...prev };
+        delete newMessages[chatId];
+        return newMessages;
+      });
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const value = {
+    chats,
+    messages,
+    unreadCount,
+    isLoading,
+    error,
+    createChat,
+    sendMessage,
+    markMessagesAsRead,
+    deleteChat
+  };
+
+  return (
+    <ChatContext.Provider value={value}>
+      {children}
+    </ChatContext.Provider>
+  );
+};
+
+// src/pages/Profile.js
+import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  Paper,
+  Typography,
+  TextField,
+  Button,
+  Avatar,
+  Grid,
+  IconButton,
+  Select,
+  MenuItem,
+  Chip,
+  Stack,
+  useTheme,
+  useMediaQuery,
+  CircularProgress
+} from '@mui/material';
+import {
+  Edit as EditIcon,
+  Save as SaveIcon,
+  Cancel as CancelIcon,
+  PhotoCamera as PhotoCameraIcon
+} from '@mui/icons-material';
+import { useAuth } from '../context/AuthContext';
+import { useProfile } from '../context/ProfileContext';
+import { useRole } from '../context/RoleContext';
+
+const Profile = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const { user } = useAuth();
+  const { isExecutor } = useRole();
+  const {
+    profileData,
+    isLoading,
+    error,
+    updateProfile,
+    updateProfilePhoto,
+    updateSpecializations
+  } = useProfile();
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [isEditingSpecializations, setIsEditingSpecializations] = useState(false);
+  const [tempSpecializations, setTempSpecializations] = useState([]);
+  const [localProfileData, setLocalProfileData] = useState({
+    name: '',
+    about: '',
+    specializations: [],
+    experience: '',
+    skills: '',
+    education: '',
+    languages: '',
+    location: '',
+    website: '',
+    photoURL: '',
+    rating: 0,
+    completedProjects: 0
+  });
+
+  useEffect(() => {
+    if (profileData) {
+      setLocalProfileData(profileData);
+      setTempSpecializations(profileData.specializations || []);
+    }
+  }, [profileData]);
+
+  const handleInputChange = (field) => (event) => {
+    setLocalProfileData(prev => ({
+      ...prev,
+      [field]: event.target.value
+    }));
+  };
+
+  const handleSpecializationChange = (event) => {
+    setTempSpecializations(event.target.value);
+  };
+
+  const handleApplySpecializations = async () => {
+    await updateSpecializations(tempSpecializations);
+    setIsEditingSpecializations(false);
+  };
+
+  const handleSaveProfile = async () => {
+    await updateProfile(localProfileData);
+    setIsEditing(false);
+  };
+
+  const handlePhotoChange = async (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      await updateProfilePhoto(file);
+    }
+  };
+
+  const renderExecutorInfo = () => {
+    if (!isExecutor()) return null;
+
+    return (
+      <Grid container spacing={3}>
+        <Grid item xs={12}>
+          <Paper sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6">Профессиональная информация</Typography>
+              <IconButton
+                color="primary"
+                onClick={() => setIsEditing(!isEditing)}
+                sx={{ ml: 1 }}
+              >
+                {isEditing ? <CancelIcon /> : <EditIcon />}
+              </IconButton>
+            </Box>
+
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Специализации</InputLabel>
+                  <Select
+                    multiple
+                    value={tempSpecializations}
+                    onChange={handleSpecializationChange}
+                    disabled={!isEditing}
+                    renderValue={(selected) => (
+                      <Stack direction="row" spacing={1} flexWrap="wrap">
+                        {selected.map((value) => (
+                          <Chip key={value} label={value} />
+                        ))}
+                      </Stack>
+                    )}
+                    endAdornment={
+                      isEditing && (
+                        <Button
+                          onClick={handleApplySpecializations}
+                          sx={{ mr: 1 }}
+                        >
+                          Сохранить
+                        </Button>
+                      )
+                    }
+                  >
+                    <MenuItem value="Frontend">Frontend</MenuItem>
+                    <MenuItem value="Backend">Backend</MenuItem>
+                    <MenuItem value="Fullstack">Fullstack</MenuItem>
+                    <MenuItem value="Mobile">Mobile</MenuItem>
+                    <MenuItem value="DevOps">DevOps</MenuItem>
+                    <MenuItem value="QA">QA</MenuItem>
+                    <MenuItem value="UI/UX">UI/UX</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  label="Опыт работы"
+                  value={localProfileData.experience}
+                  onChange={handleInputChange('experience')}
+                  disabled={!isEditing}
+                  sx={{ height: 'auto' }}
+                />
+              </Grid>
+
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  label="Навыки"
+                  value={localProfileData.skills}
+                  onChange={handleInputChange('skills')}
+                  disabled={!isEditing}
+                  sx={{ height: 'auto' }}
+                />
+              </Grid>
+
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  label="Образование"
+                  value={localProfileData.education}
+                  onChange={handleInputChange('education')}
+                  disabled={!isEditing}
+                  sx={{ height: 'auto' }}
+                />
+              </Grid>
+
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  label="Языки"
+                  value={localProfileData.languages}
+                  onChange={handleInputChange('languages')}
+                  disabled={!isEditing}
+                  sx={{ height: 'auto' }}
+                />
+              </Grid>
+            </Grid>
+          </Paper>
+        </Grid>
+      </Grid>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography color="error">{error}</Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ p: 3 }}>
+      <Grid container spacing={3}>
+        <Grid item xs={12}>
+          <Paper sx={{ p: 3, position: 'relative' }}>
+            <Box sx={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', mb: 3 }}>
+              <Box sx={{ position: 'relative', mr: isMobile ? 0 : 3, mb: isMobile ? 2 : 0 }}>
+                <input
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  id="photo-upload"
+                  type="file"
+                  onChange={handlePhotoChange}
+                />
+                <label htmlFor="photo-upload">
+                  <Avatar
+                    src={localProfileData.photoURL}
+                    alt={localProfileData.name}
+                    sx={{
+                      width: 120,
+                      height: 120,
+                      cursor: 'pointer',
+                      bgcolor: 'primary.main',
+                      boxShadow: 2,
+                      '&:hover': {
+                        transform: 'scale(1.1)',
+                        boxShadow: 4,
+                      },
+                      transition: 'all 0.3s ease',
+                    }}
+                  />
+                </label>
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <Box>
+                    <Typography variant="h4" gutterBottom>
+                      {localProfileData.name}
+                    </Typography>
+                    <Typography variant="subtitle1" color="text.secondary" gutterBottom>
+                      {user?.email}
+                    </Typography>
+                    {isExecutor() && (
+                      <Box sx={{ mt: 1 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          Рейтинг: {localProfileData.rating}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Завершенных проектов: {localProfileData.completedProjects}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                  <IconButton
+                    color="primary"
+                    onClick={() => setIsEditing(!isEditing)}
+                    sx={{ ml: 1 }}
+                  >
+                    {isEditing ? <CancelIcon /> : <EditIcon />}
+                  </IconButton>
+                </Box>
+              </Box>
+            </Box>
+
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  label="О себе"
+                  value={localProfileData.about}
+                  onChange={handleInputChange('about')}
+                  disabled={!isEditing}
+                  sx={{ height: 'auto' }}
+                />
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Местоположение"
+                  value={localProfileData.location}
+                  onChange={handleInputChange('location')}
+                  disabled={!isEditing}
+                />
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Веб-сайт"
+                  value={localProfileData.website}
+                  onChange={handleInputChange('website')}
+                  disabled={!isEditing}
+                />
+              </Grid>
+
+              {isEditing && (
+                <Grid item xs={12}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={handleSaveProfile}
+                    startIcon={<SaveIcon />}
+                  >
+                    Сохранить изменения
+                  </Button>
+                </Grid>
+              )}
+            </Grid>
+          </Paper>
+        </Grid>
+
+        {renderExecutorInfo()}
+      </Grid>
+    </Box>
+  );
+};
+
+export default Profile;
+
+// src/pages/Chat.js
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Box,
+  Paper,
+  Typography,
+  TextField,
+  IconButton,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemAvatar,
+  Avatar,
+  Divider,
+  useMediaQuery,
+  useTheme,
+  InputAdornment,
+  Badge,
+  CircularProgress
+} from '@mui/material';
+import {
+  Send as SendIcon,
+  Search as SearchIcon,
+  Delete as DeleteIcon
+} from '@mui/icons-material';
+import { useChat } from '../context/ChatContext';
+import { useAuth } from '../context/AuthContext';
+import { useProfile } from '../context/ProfileContext';
+
+const Chat = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const { user } = useAuth();
+  const { profile } = useProfile();
+  const {
+    chats,
+    messages,
+    unreadCount,
+    isLoading,
+    error,
+    createChat,
+    sendMessage,
+    markMessagesAsRead,
+    deleteChat
+  } = useChat();
+
+  const [selectedChat, setSelectedChat] = useState(null);
+  const [newMessage, setNewMessage] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [selectedChat, messages]);
+
+  useEffect(() => {
+    if (selectedChat) {
+      markMessagesAsRead(selectedChat.id);
+    }
+  }, [selectedChat, markMessagesAsRead]);
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !selectedChat) return;
+
+    await sendMessage(selectedChat.id, newMessage.trim());
+    setNewMessage('');
+  };
+
+  const handleKeyPress = (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const filteredChats = chats.filter(chat => {
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      chat.userData.displayName.toLowerCase().includes(searchLower) ||
+      chat.userData.username.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const renderChatList = () => (
+    <Box sx={{ width: isMobile ? '100%' : 300, borderRight: 1, borderColor: 'divider' }}>
+      <Box sx={{ p: 2 }}>
+        <TextField
+          fullWidth
+          variant="outlined"
+          placeholder="Поиск чатов..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+        />
+      </Box>
+      <List sx={{ overflow: 'auto', maxHeight: 'calc(100vh - 180px)' }}>
+        {filteredChats.map((chat) => {
+          const unreadMessages = messages[chat.id]?.filter(
+            msg => !msg.read && msg.senderId !== user.id
+          ).length || 0;
+
+          return (
+            <ListItem
+              key={chat.id}
+              button
+              selected={selectedChat?.id === chat.id}
+              onClick={() => setSelectedChat(chat)}
+              sx={{
+                '&.Mui-selected': {
+                  backgroundColor: 'primary.light',
+                  '&:hover': {
+                    backgroundColor: 'primary.light',
+                  },
+                },
+              }}
+            >
+              <ListItemAvatar>
+                <Badge
+                  badgeContent={unreadMessages}
+                  color="error"
+                  overlap="circular"
+                >
+                  <Avatar
+                    src={chat.userData.photoURL}
+                    alt={chat.userData.displayName}
+                    sx={{
+                      bgcolor: 'primary.main',
+                      boxShadow: 2,
+                      '&:hover': {
+                        transform: 'scale(1.1)',
+                        boxShadow: 4,
+                      },
+                      transition: 'all 0.3s ease',
+                    }}
+                  />
+                </Badge>
+              </ListItemAvatar>
+              <ListItemText
+                primary={chat.userData.displayName}
+                secondary={chat.lastMessage?.text || 'Нет сообщений'}
+                primaryTypographyProps={{
+                  fontWeight: unreadMessages > 0 ? 'bold' : 'normal',
+                }}
+                secondaryTypographyProps={{
+                  color: unreadMessages > 0 ? 'primary.main' : 'text.secondary',
+                }}
+              />
+            </ListItem>
+          );
+        })}
+      </List>
+    </Box>
+  );
+
+  const renderChatWindow = () => {
+    if (!selectedChat) {
+      return (
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            color: 'text.secondary',
+          }}
+        >
+          <Typography variant="h6">Выберите чат для начала общения</Typography>
+        </Box>
+      );
+    }
+
+    const chatMessages = messages[selectedChat.id] || [];
+
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Box
+          sx={{
+            p: 2,
+            borderBottom: 1,
+            borderColor: 'divider',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Avatar
+              src={selectedChat.userData.photoURL}
+              alt={selectedChat.userData.displayName}
+              sx={{
+                mr: 2,
+                bgcolor: 'primary.main',
+                boxShadow: 2,
+                '&:hover': {
+                  transform: 'scale(1.1)',
+                  boxShadow: 4,
+                },
+                transition: 'all 0.3s ease',
+              }}
+            />
+            <Typography variant="h6">{selectedChat.userData.displayName}</Typography>
+          </Box>
+          <IconButton
+            color="error"
+            onClick={() => {
+              deleteChat(selectedChat.id);
+              setSelectedChat(null);
+            }}
+          >
+            <DeleteIcon />
+          </IconButton>
+        </Box>
+
+        <Box
+          sx={{
+            flex: 1,
+            overflow: 'auto',
+            p: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1,
+          }}
+        >
+          {chatMessages.map((message) => (
+            <Box
+              key={message.id}
+              sx={{
+                display: 'flex',
+                justifyContent: message.senderId === user.id ? 'flex-end' : 'flex-start',
+                mb: 1,
+              }}
+            >
+              <Paper
+                sx={{
+                  p: 1.5,
+                  maxWidth: '70%',
+                  backgroundColor: message.senderId === user.id ? 'primary.main' : 'grey.100',
+                  color: message.senderId === user.id ? 'white' : 'text.primary',
+                  borderRadius: 2,
+                }}
+              >
+                <Typography variant="body1">{message.text}</Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    display: 'block',
+                    textAlign: 'right',
+                    color: message.senderId === user.id ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary',
+                  }}
+                >
+                  {new Date(message.timestamp).toLocaleTimeString()}
+                </Typography>
+              </Paper>
+            </Box>
+          ))}
+          <div ref={messagesEndRef} />
+        </Box>
+
+        <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="Введите сообщение..."
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onKeyPress={handleKeyPress}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    color="primary"
+                    onClick={handleSendMessage}
+                    disabled={!newMessage.trim()}
+                  >
+                    <SendIcon />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Box>
+      </Box>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          color: 'error.main',
+        }}
+      >
+        <Typography variant="h6">{error}</Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Box
+      sx={{
+        height: 'calc(100vh - 64px)',
+        display: 'flex',
+        flexDirection: isMobile ? 'column' : 'row',
+      }}
+    >
+      {renderChatList()}
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {renderChatWindow()}
+      </Box>
+    </Box>
+  );
+};
+
+export default Chat; 
