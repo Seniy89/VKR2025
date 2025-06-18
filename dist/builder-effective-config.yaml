@@ -1,0 +1,21 @@
+directories:
+  output: dist
+  buildResources: assets
+files:
+  - filter:
+      - build/**/*
+      - build/**/*
+      - node_modules/**/*
+      - main.js
+extraMetadata:
+  main: build/electron.js
+appId: com.digitaldesign.platform
+win:
+  target: nsis
+  icon: build/icon.ico
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+extends: react-cra
+electronVersion: 28.3.3

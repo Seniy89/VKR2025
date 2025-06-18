@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="100%" height="100%" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="orangeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B00;stop-opacity:0.3"/>
+      <stop offset="100%" style="stop-color:#FF3D00;stop-opacity:0.3"/>
+    </linearGradient>
+    
+    <!-- Анимация для фона -->
+    <pattern id="grid" x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse">
+      <path d="M 10 0 L 0 0 0 10" fill="none" stroke="url(#orangeGradient)" stroke-width="0.2">
+        <animate attributeName="stroke-opacity" values="0.1;0.3;0.1" dur="3s" repeatCount="indefinite"/>
+      </path>
+    </pattern>
+  </defs>
+  
+  <!-- Фоновый прямоугольник -->
+  <rect width="100%" height="100%" fill="#1a1a1a"/>
+  <rect width="100%" height="100%" fill="url(#grid)"/>
+  
+  <!-- Анимированные круги -->
+  <circle cx="20" cy="20" r="2" fill="url(#orangeGradient)">
+    <animate attributeName="opacity" values="0.1;0.3;0.1" dur="4s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="80" cy="80" r="2" fill="url(#orangeGradient)">
+    <animate attributeName="opacity" values="0.1;0.3;0.1" dur="4s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="50" cy="50" r="2" fill="url(#orangeGradient)">
+    <animate attributeName="opacity" values="0.1;0.3;0.1" dur="4s" repeatCount="indefinite"/>
+  </circle>
+</svg> 
